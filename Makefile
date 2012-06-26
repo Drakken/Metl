@@ -1,7 +1,11 @@
 
 LIB=/home/dan/me/ocaml/lib
 
-.PHONY:  clean minml string sanitize test all
+.PHONY:  entries clean minml string sanitize test all
+
+entries:
+	ocamlbuild -cflags -I,+camlp4 -pp camlp4rf entries.cmo
+	cp _build/entries.cmo $(LIB)/
 
 string:
 	ocamlbuild -cflags -I,+camlp4 -Is Metl,MetlString MetlString/PaMetlString.cmo
@@ -23,4 +27,4 @@ minml:
 test:
 	minml.byte Minml/ruletest.ml
 
-all: string minml test
+all:  entries string minml test

@@ -1,14 +1,16 @@
 
-This is the README file for Metl, a generic PEG system for OCaml.
-Metl is loosely based on OMeta, 
+This is the README file for Metl, a generic parsing-expression-grammar
+(PEG) system for OCaml.  Metl is loosely based on Allesandro Warth's 
+OMeta pattern-matching language.  See manual.html for details.
 
-To see what Metl can do, set $(LIB) in Makefile and edit */_tags
-accordingly, and run "make all".
+There's no configure script yet, so the only way to build Metl
+currently is to manually edit the lib directory in Makefile, 
+Metl/_tags, and Minml/_tags.  Then you can run "make all".
 
-As of June 2012, Metl is still in "toy" status.
-Please contact Dan Bensen (danbensen@att.net) for bug reports,
-feature requests, and other related comments.
+Please contact Dan Bensen (danbensen@att.net) for any bug reports,
+feature requests, and other related comments you might have.
 
 TODO:
+* config script
 * locations
 * packrat optimization
