@@ -6,8 +6,6 @@ end;
 
 open Camlp4.PreCast;
 
-(* module Metl = struct include Metl; end; *)
-
 module Make (U: sig end) = struct
 
   module Reader : Metl.READER.T = struct
@@ -15,13 +13,10 @@ module Make (U: sig end) = struct
     open Metl.Utils
     ;
     value next =
- <:expr<
-(*      (metlbuf.MetlStringAux.Aux.string.[metlbuf.MetlStringAux.Aux.n],
-       { metlbuf with MetlStringAux.Aux.n = metlbuf.MetlStringAux.Aux.n + 1})
-*)      MetlStringAux.Aux.((metlbuf.string.[metlbuf.n], {(metlbuf) with n = metlbuf.n + 1}))
- >>
+    <:expr< MetlStringAux.Aux.((metlbuf.string.[metlbuf.n],
+				{(metlbuf) with n = metlbuf.n + 1})) >>
     ;
-    value eoi = <:expr< metlbuf.MetlStringAux.Aux.n = metlbuf.MetlStringAux.Aux.length >>
+    value eoi = <:expr< MetlStringAux.Aux.(metlbuf.n = metlbuf.length) >>
     ;
     value next_char_test_name c = 
       if      Base. is_word_char  c then  "is_word_char"
@@ -31,7 +26,7 @@ module Make (U: sig end) = struct
     ;
     value token_expr tok =
       let f = next_char_test_name tok.[String.length tok - 1] in
-      <:expr< MetlStringAux.Aux.parse MetlStringAux.Base.$lid:f$ $str:tok$ metlbuf >>
+      <:expr< MetlStringAux.Aux.has_token MetlStringAux.Base.$lid:f$ $str:tok$ metlbuf >>
     ;
     type ast =
       [ String of (string*string)
@@ -40,7 +35,13 @@ module Make (U: sig end) = struct
     ;
     value rec parser_expr x p enone esome =
       match p with
-      [ String s _ -> <:expr< if not $token_expr s$ then $enone$ else $esome$ >>
+      [ String s _ ->
+	let len = String.length s in
+	<:expr<
+	if not $token_expr s$ then $enone$
+	else
+	  let metlbuf = MetlStringAux.Aux.({(metlbuf) with n = metlbuf.n + $int: string_of_int len$})
+	  in $esome$ >>
       | Char (_,str) ->
           <:expr< match (MetlStringAux.Aux.char $chr:str$ metlbuf) with
                   [ None -> $enone$
@@ -55,11 +56,7 @@ module Make (U: sig end) = struct
     value range  = Gram.Entry.mk "parsr";
   
     EXTEND Gram
-      range: [
-	[ (* `SYMBOL ".";`SYMBOL "."; `CHAR c s -> (c,s)
-        |  `SYMBOL ".."; `CHAR c s -> (c,s)
-        | *)        ".."; `CHAR c s -> (c,s)
-      ]]
+      range: [[".."; `CHAR c s -> (c,s)]]
       ;
       parsr: [
         [ `STRING s s' -> String (s,s')
@@ -71,7 +68,7 @@ module Make (U: sig end) = struct
     
   end;
     
-  module M = Metl.Combinators.Make(Reader);
+  module M = Metl.Syntax.Make(Reader);
     
 end;
 

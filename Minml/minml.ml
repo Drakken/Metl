@@ -30,6 +30,7 @@ let process infile =
 let () =
   Camlp4.Register.enable_ocaml_printer ();
   match Sys.argv with 
-  | [||] -> failwith "Please enter infile."
-  | [|infile|] -> process infile
-  | _ -> failwith "Too many args."
+  | [||] -> assert false
+  | [|_|] -> failwith "Please enter infile."
+  | [|_;infile|] -> process infile
+  | args -> failwith (string_of_int (Array.length args) ^ " args.")

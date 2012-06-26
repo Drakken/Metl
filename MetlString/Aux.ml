@@ -35,7 +35,7 @@ let is_delimitor str =
 
 (* type t = Word | Symbol | Delim | Mixed *)
 
-let parse next_char_test tok mb = 
+let has_token next_char_test tok mb = 
   let len = String.length tok
   in let xlen = mb.length - mb.n
   in xlen >= len

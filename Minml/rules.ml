@@ -11,11 +11,9 @@ value fun_app =
 
 value ows = rule [LIST0 (' ' | '\t')]   (* [O]ptional [W]hite [S]pace *);
 
-value n  = rule ['\n'];             (* [N]ewline required  *)
-(* value nn = rule ['\n'->'\n'];             (* [N]ewline required  *)
-*)
+value n  = rule ['\n'];                   (* [N]ewline required  *)
 value ns = rule [LIST0 n SEP ows -> ()];  (* [N]ewline[S] allowed *)
-value no = rule [ !n ];             (* [NO] newlines allowed *)
+value no = rule [ !n ];                   (* [NO] newlines allowed *)
 
 value ws fn =                        (* [W]hite [S]pace *)
   if fn == ns
@@ -35,11 +33,11 @@ value string_of_chars chars =
     fun [ [] -> str | [c::cs] -> do { str.[n] := c; loop (n+1) cs } ]
   in loop 0 chars
 ;
-value lid = rule [lc:c; LIST0 word_char: cs -> string_of_chars [c::cs] ]
+value lid = rule [lc:c; LIST0 word_char: cs; ows -> string_of_chars [c::cs]]
 ;
 value expr fn = rule [LIST1 lid SEP (ws fn) : xs -> fun_app xs]
 ;
-value binding fn = rule [lid:x; fn; "="; expr fn: e; n -> (x,e)]
+value binding fn = rule [lid:x; fn; "="; ows; expr fn: e; n -> (x,e)]
 ;
 (*    multibind fn = rule ["let"; n; LIST0 binding: xes; "in"; fn -> xes]
 and *)

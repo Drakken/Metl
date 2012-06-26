@@ -1,11 +1,12 @@
 
 open Utils;
 
-open Camlp4.PreCast;
+open Camlp4;
 
-module Entry = Gram.Entry;
-
-module OCaml = Syntax;
+module Entry = PreCast.Gram.Entry;
+module OCaml = PreCast.Syntax;
+module  Ast  = PreCast.Ast;
+module Gram  = PreCast.Gram;
 
 module Make (Reader: READER.T) = struct
 

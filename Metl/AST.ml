@@ -55,11 +55,11 @@ module Make (Reader: READER.T) = struct
     else invalid_arg "binding in seq"
   and
       test_parser p tfnone tfsome enone esome =
-    let rzult = gensym "rzult" in
+    let rzult  = gensym "rzult"  in
     let ep = parser_expr __ p <:expr< $uid:tfnone$ >> <:expr< $uid:tfsome$ >>
     in <:expr<
-         let $lid:rzult$ = let metlbuf = metlbuf in $ep$
-         in if $lid:rzult$ then $enone$ else $esome$ >>
+    let $lid:rzult$ = $ep$ in
+    if $lid:rzult$ then $enone$ else $esome$ >>
   and
       absent  p enone esome = test_parser p "False" "True" enone esome
   and present p enone esome = test_parser p "True" "False" enone esome
