@@ -1,7 +1,11 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 type metl_buffer = { str: string; length: int; n: int }
 
-let is_no_char c = false
+let make_buffer str = { str=str; length = String.length str; n = 0 }
 
 let char c buf =
   if buf.n >= buf.length || buf.str.[buf.n] <> c

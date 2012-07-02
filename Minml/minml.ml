@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 let sum ns = List.fold_left (+) 0 ns
 
@@ -17,15 +21,17 @@ let input_file infile =
   in
   String.concat "\n" (with_open_in infile f)
 
-module MS = MetlStringAux
+module MS = MetlStringAux.Aux
 
 let process infile =
   let text = input_file infile in
-  let metlbuf = { MS.Aux.str=text; MS.Aux.length = String.length text; MS.Aux.n=0 }
+  let metlbuf = { MS.str=text; MS.length = String.length text; MS.n=0 }
   in
   match Rules.implem metlbuf with
   | None -> print_endline "No decls."
-  | Some (decls,_) -> List.iter Camlp4.PreCast.Printers.OCaml.print_implem decls
+  | Some (decls,metlbuf) ->
+     Printf.printf "metlbuf.n = %d\n" metlbuf.MS.n;
+     List.iter Camlp4.PreCast.Printers.OCaml.print_implem decls
 
 let () =
   Camlp4.Register.enable_ocaml_printer ();

@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 module Id = struct
   value name = "MetlString";
@@ -13,7 +17,7 @@ module Make (U: sig end) = struct
     open Metl.Utils
     ;
     value next =
-    <:expr< MetlStringAux.Aux.((metlbuf.string.[metlbuf.n],
+    <:expr< MetlStringAux.Aux.((metlbuf.str.[metlbuf.n],
 				{(metlbuf) with n = metlbuf.n + 1})) >>
     ;
     value eoi = <:expr< MetlStringAux.Aux.(metlbuf.n = metlbuf.length) >>

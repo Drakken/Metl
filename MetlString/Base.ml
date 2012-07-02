@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 let delim_chars = "([{}])"
 
@@ -11,3 +15,5 @@ let is_word_char c = is_alpha c || is_dig c
 
 let is_symbol_char c = String.contains symbol_chars c
 let  is_delim_char c = String.contains  delim_chars c
+
+let is_no_char _ =  false

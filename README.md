@@ -1,4 +1,4 @@
 Metl
 ====
 
-a generic PEG parsing sytsem based on OMeta, OCaml, and Camlp4
+a generic PEG parsing system based on OMeta, OCaml, and Camlp4

@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 open Camlp4.PreCast;
 
@@ -17,6 +21,7 @@ value identity x = x;
 
 value genbuf = name_generator "metl_buffer";
 
-value _loc = Loc.mk "Metl";
+value _loc = Loc.mk "Metl/Utils";
 
-value none = <:expr< None >>;
+value none   = <:expr< None >>;
+

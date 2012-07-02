@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 open Camlp4.PreCast
 

@@ -1,3 +1,7 @@
+(* 
+ * Copyright 2012 Daniel S. Bensen
+ * See LICENSE for details.
+ *)
 
 open Utils;
 
@@ -13,27 +17,25 @@ module Make (Reader: READER.T) = struct
   module AST = AST.Make(Reader);
   open AST;
 
-  value rule   = Entry.mk "rule";
-  value action = Entry.mk "action";
-  value parsr  = Entry.mk "parsr";
-  value sep    = Entry.mk "sep";
-  value bindpat = Entry.mk "bindpat"
-  ;
+  ENTRIES rule action list_arg parsr sep bindpat END
+
+  value _loc = PreCast.Loc.mk "Metl/Syntax";
+  
+  value default_pe x = fun
+    [ Seq (p1,p2) ->
+      (Seq (p1, Binding (<:patt< $lid:x$ >>, p2)), <:expr< Some ($lid:x$, metlbuf) >>)
+    | p ->     (Binding (<:patt< $lid:x$ >>, p),   <:expr< Some ($lid:x$, metlbuf) >>)
+  ];
   value pe (p,eo) =
     let x = gensym "final_var" in
     match eo with 
-    [ None -> (Binding (<:patt< $lid:x$ >>, p), <:expr< Some ($lid:x$, metlbuf) >>)
+    [ None -> default_pe x p
     | Some e ->
       let e' = <:expr< let $lid:x$ = $e$ in Some ($lid:x$, metlbuf) >>
       in (p,e') ]
   ;
   value action_asts peos = List.map pe peos
-(*    let has_action (_,eo) = eo <> None in
-    if List.for_all has_action peos then List.map pe peos
-    else if not (List.exists has_action peos)
-    then List.map (fun (p,_) -> (p, <:expr< Some ((), metlbuf) >> )) peos
-    else failwith "Found mixed alternatives"
-*)  ;
+  ;
   EXTEND Gram
   
     OCaml.expr: AFTER "top" [[ "rule"; "["; OPT "|"; pes = rule; "]" -> AST.rule_expr pes ]]
@@ -47,18 +49,21 @@ module Make (Reader: READER.T) = struct
     ;
     bindpat: [[ ":"; x = OCaml.ipatt -> x ]]
     ;
+    list_arg: [[ p = OCaml.a_LIDENT -> App (p,[]) | p = parsr LEVEL "closed" -> p ]]
+    ;
     parsr:
       [ "alt" [ ps = LIST1 NEXT SEP "|"-> Alts ps ]
       |  "seq"  [ p1 = SELF; ";"; p2 = NEXT -> Seq (p1,p2) ]
       | "binding" [ p = NEXT; xo = OPT bindpat -> match xo with [None -> p | Some x -> Binding (x,p)] ]
+      | "app"
+	[ p = OCaml.a_LIDENT; args = LIST0 (OCaml.expr LEVEL "simple") -> App (p,args) ]
       | "unary" NONA
         [ "!"; p = NEXT -> Absent  p
         | "&"; p = NEXT -> Present p
         | "?"; e = OCaml.expr ->  Test  e
         | "OPT"; p = NEXT -> Opt p
-        | "LIST0"; p = NEXT; so = OPT sep -> List0 (p,so)
-        | "LIST1"; p = NEXT; so = OPT sep -> List1 (p,so) ]
-      | "app" [ p = OCaml.a_LIDENT; args = LIST0 OCaml.expr -> App (p,args) ]
+        | "LIST0"; p = list_arg; so = OPT sep -> List0 (p,so)
+        | "LIST1"; p = list_arg; so = OPT sep -> List1 (p,so) ]
       | "closed"
          [ "EOI" -> Eoi
          | "ANY" -> Any

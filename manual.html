@@ -5,18 +5,31 @@
 
 <style type="text/css">
 div.info { margin-left : 3em; margin-right : 3em }
+pre { margin-left: 3em }
 </style>
 </head>
 <body>
 <h1 style="text-align:center">Metl User's Manual</h1>
 
+<table align="center" style="border-spacing: 1em .5em"> <!-- max-width: 48em; min-width: 30em"-->
+<tr><td>
 <a href="#Tutorial">Getting started</a>
 <br><a href="#Grammar">Grammar and precedence table</a>
 <br><a href="#MetlString">MetlString</a>
 <br><a href="#OtherTypes">Other types of data</a>
+</td><td>
+<a href="Plugins">Defining a Camlp4 plugin</a>
+<br><a href="#Aux">The runtime module</a>
 <br><a href="#Reader">Reader</a>
-<br><a href="Plugins">Defining a Camlp4 plugin</a>
-<a href="#"></a>
+<br><a href="#Camlp4">Extending Camlp4 syntax</a>
+</td></tr></table>
+
+
+
+
+
+
+
 <p>
 Metl is a generic system for creating PEG-style parsers in <a href="http://caml.inria.fr/ocaml/index.en.html">OCaml</a>.
 Its design is loosely based on <a href="http://tinlizzie.org/ometa/">OMeta</a>,
@@ -34,58 +47,61 @@ To write a program that parses character strings,
  you define a set of functions that use Metl's parsing rules
 and MetlString's terminal syntax,
  wrap the string in a value of type MetlStringAux.Aux.metl_buffer,
- and apply the main (overall) parsing function to the buffer.
+ and apply the entry-point parsing function to the buffer.
 Once your Metl parsers are written, you use Camlp4 and PaMetlString.cmo to preprocess them:
 
-<pre>    ocamlc -I +camlp4 -I $(LIB) -pp "camlp4 $(LIB)/PaMetlString.cmo" \
-        dynlink.cma camlp4lib.cma MetlStringAux.cma foo.ml</pre>
+<pre>ocamlc -I +camlp4 -I $(LIB) -pp "camlp4 $(LIB)/PaMetlString.cmo" \
+    dynlink.cma camlp4lib.cma MetlStringAux.cma foo.ml</pre>
 
 <h3>Rules</h3>
 Each Metl rule defines a function that takes a single argument
  (the buffer) and parses it according to the contents of the rule.
 Rules are syntactic forms that consist of the keyword "<tt>rule</tt>"
- followed by one or more pattern/expression pairs (alternatives),
-all contained in square brackets.
-<br>
+ followed by a pair of square brackets containing one or more pattern/expression pairs (alternatives) separated by pipe characters.<br>
 For example, these rules will parse strings containing two digits separated by a plus sign:
-<pre
->    let number = rule ['0'..'9': digit -> Char.code digit - Char.code '0']
-    let sum = rule [number: x; "+"; number: y -> x + y]
+<pre>let digit = rule ['0'..'9': d -> Char.code d - Char.code '0']
+let sum = rule [digit: x; "+"; digit: y -> (x,y)]
+let print_sum = rule [sum: (x,y) -> Printf.printf "%d + %d = %d\n" x y (x+y)]
+let _ = print_sum (MetlStringAux.Aux.make_buffer "2+2")
 </pre>
-<tt>sum</tt> is the entry point.  
-It returns the sum of the two (single-digit) numbers:
-<pre>    Printf.printf "2 + 2 = %d\n" (sum "2+2")</pre>
 <p>
 These are some important features of the above rules:
 <ul><li>Everything before the arrow defines the rule's parser.
 </li><li>The expression after the arrow is the rule's return value.
 </li><li>Semicolons represent a sequence.
-</li><li><tt>x</tt> and <tt>y</tt> are new variables.  
-The pattern <tt>p:x</tt> binds the name <tt>x</tt>
+</li><li><tt>x</tt>, <tt>y</tt>, and <tt>d</tt> are new variables.  
+The pattern <tt>p:x</tt> binds the pattern <tt>x</tt>
  to the value returned by the parsing expression <tt>p</tt>.
 </li><li>Single quotes enclose character literals,
  double quotes enclose string literals,
  and ".." indicates a range of characters.
- These string-specific patterns are defined in PaMetlString. 
+ These are string-specific patterns defined in PaMetlString. 
 </li></ul>
 
 As currently written, <tt>sum</tt> will also accept strings with additional text,
 for instance "2+2=sqrt(foo)". 
 If you want to disallow extra text, you can test for the end of the string with <tt>EOI</tt> ("end of input"):
 
-<pre>    let sum = rule [digit: x; "+"; digit: y; EOI -> x + y]</pre>
+<pre>let sum = rule [digit: x; "+"; digit: y; EOI -> (x,y)]</pre>
 
 Now <tt>sum</tt> will reject any string with trailing text.
 <p>
 To match multidigit numbers, you can apply the metarule <tt>LIST1</tt> to a similar digit parser:
 
-<pre>    let digstr = rule ['0'..'9': d -> Char.escaped d]
-    let number =
-      rule [LIST1 digstr: digstrs ->
-              int_of_string (List.fold_left (^) "" digstrs)]
-    let sum = rule [number: x; "+"; number: y; EOI -> x + y]
+<pre>let digstr = rule ['0'..'9': d -> Char.escaped d]
+let number =
+  rule [LIST1 digstr: digstrs ->
+          int_of_string (List.fold_left (^) "" digstrs)]
+let sum = rule [number: x; "+"; number: y; EOI -> x + y]
 </pre>
-Other features of Metl rules include default return values and multiple alternatives. See the grammar and precedence table for details.
+To allow optional whitespace, use <tt>LIST0</tt> and alternatives:
+<pre>let ows = rule [LIST0 (' '|'\t')]
+let sum = rule [number: x; ows; "+"; ows; number: y -> x + y]
+</pre>
+Other features of Metl rules include default return values, the wildcard <tt>ANY</tt>, and tests.
+See the grammar and precedence table for details.
+To inherent the rules of one parser in another,
+ include the base parser's module in the child module.
 <p>
 <h2 id="Grammar">Grammar and precedences</h2>
 
@@ -113,7 +129,7 @@ Operators are listed in order of decreasing priority.
 </tr><tr><td align="center"><tt>? <em>boolean</em></tt></td><td>test expression (must be true)</td>
 </tr><tr><td align="center"><tt>OPT <em>parser</em></tt></td><td><tt>parser</tt> may or may not be matched (<tt>OPT</tt> always succeeds); returns an option</td>
 </tr><tr><td align="center"><tt>LIST0&nbsp;<em>parser1</em>&nbsp;[SEP&nbsp;<em>parser2</em>]</tt></td><td>consumes as many matches to <tt>parser1</tt> as possible, separated by (single) matches to <tt>parser2</tt> if specified; returns a list of the <tt>pattern1</tt> matches</td>
-</tr><tr><td align="center"><tt>LIST1&nbsp;<em>parser1</em>&nbsp;[SEP&nbsp;<em>parser2</em>]</tt></td><td>same as LIST0, except there must be at least one match</td>
+</tr><tr><td align="center"><tt>LIST1&nbsp;<em>parser1</em>&nbsp;[SEP&nbsp;<em>parser2</em>]</tt></td><td>same as <tt>LIST0</tt>, except there must be at least one match</td>
 </tr><tr>
 <th colspan=2>&nbsp;</th>
 </tr><tr>
@@ -154,43 +170,86 @@ word characters: '_', 'A'..'Z', 'a'..'z', and '0'..'9'
 </li><li>If all the characters in a token are in the same class,
 the token may not be followed by a character in that class.
 If the token is mixed, there is no restriction.
-</li><li>
-
-let is_symbol_char c = String.contains symbol_chars c
-let  is_delim_char c = String.contains  delim_chars c
 </li></ul>
-
 
 These are commands to compile string-parsing code from foo.ml to byte code:
 
 <ul><li>Directly, with ocamlc:
-<pre>    ocamlc -I +camlp4 -I $(LIB) -pp "camlp4 $(LIB)/PaMetlString.cmo" \
-        dynlink.cma camlp4lib.cma MetlStringAux.cma foo.ml</pre>
+<pre>ocamlc -I +camlp4 -I $(LIB) -pp "camlp4 $(LIB)/PaMetlString.cmo" \
+    dynlink.cma camlp4lib.cma MetlStringAux.cma foo.ml</pre>
 </li><li>
 Or indirectly, with ocamlbuild:
 <pre>
-	ocamlbuild -libs dynlink,camlp4lib,MetlStringAux \
-	-cflags -I,+camlp4,-I,$(LIB) \
-	-lflags -I,+camlp4,-I,$(LIB) \
-	 foo.byte
+ocamlbuild -libs dynlink,camlp4lib,MetlStringAux \
+    -cflags -I,+camlp4,-I,$(LIB) \
+    -lflags -I,+camlp4,-I,$(LIB) \
+    foo.byte
 </pre>
 </li></ul>
 <p>
 <h2 id="OtherTypes">Parsing other data types</h2>
 
 If you want to parse something other than simple character strings,
-you can create your own parsing module.
-Your module will extend Camlp4's syntax as needed.
+you can use Metl to create your own parsing system.
+Your system will extend Camlp4's syntax as needed
+ to describe the terminal values in the data to be parsed,
+ and Metl will provide combinator expressions for that syntax and data.
 <p>
-Metl is implemented as the OCaml functor Metl.Combinators.Make.
-Its parameter, called Reader, implements the terminal syntax.  
+Metl is implemented as the OCaml functor <tt>Metl.Combinators.Make</tt>.
+It takes one parameter, called "<tt>Reader</tt>", which implements the terminal syntax.  
 
-There are several steps in creating a new Metl parsing module.
+There are two modules in a Metl parsing system:
 <ul><li>a Camlp4 plugin
-</li><li>a module for any functions that will be needed by the parser.
+</li><li>a module for any support functions that will be needed by the parser.
 </li></ul>
 
 <p>
+You parse a Metl file by passing a Metl module to Camlp4:
+
+<pre>ocamlc -pp "camlp4rf PaMetlFoo.cmo" MetlFooAux.cmo bar.ml</pre>
+
+<p>
+
+<h2 id="Plugins">Defining a Camlp4 plugin</h2>
+
+To define a Camlp4 plugin for Metl, do as follows:
+
+<ol><li>Define a Reader module that extends the <tt>Camlp4.PreCast</tt> grammar
+ and the Metl parser to match the terminal values in the data.  
+See the Reader section for details.
+</li><li>Wrap Reader in a functor that passes it to <tt>Metl.Syntax.Make</tt>.
+</li><li>Define a small module, of type <tt>Camlp4.Sig.Id</tt>,
+ that identifies your parser to Camlp4.
+</li><li>Pass these modules to the functor Camlp4.Register.Plugin.
+ (<em>note: this will probably be changed soon to use OCamlSyntaxExtension instead of Plugin.</em>)
+</li></ol>
+<pre>
+module Make (U: sig end) = struct
+  module Reader : Metl.READER.T = struct
+   (* 
+    * Put your syntax and parser extensions here.
+    * See the Camlp4 documentation for a discussion of how to extend Camlp4 syntax.
+    *)
+  module M = Metl.Syntax.Make(Reader);
+end;
+
+module Id = struct
+  value name = "Foo";
+  value version = "1.0";
+end;
+
+module M = Camlp4.Register.Plugin (Id) (Make);
+</pre>
+
+<h2 id="Aux">The runtime module</h2>
+
+The auxiliary module must define the type of <tt>metlbuf</tt> 
+and any function used by the parser.
+
+<ol><li>All parsing expressions must ensure that the name "<tt>metlbuf</tt>" is always bound to a current buffer, i.e. one for which <tt>next</tt> evaluates to the next item in the data series.
+</li><li>Define a type for the buffer in a module to be linked with the final parsing code.
+</li><li>Write code to initialize the buffer with the data and pass the buffer to your main parsing function.
+</li></ol>
 
 <h2 id="Reader">Reader</h2>
 
@@ -228,73 +287,20 @@ A boolean Camlp4 expression that indicates whether the end of the input data has
 </pre></b><div class="info">
 A Camlp4 expression that evalutates to <tt>(x,mb)</tt>, where <tt>x</tt> is the next item from 
 <tt>metlbuf</tt> and <tt>mb</tt> is an updated buffer.
-This expression should assume that end-of-input has not been reached.
+<tt>next</tt> should assume that end-of-input has not been reached.
 </div>
 <p>
 
-<!--
- uses <a href="http://brion.inria.fr/gallium/index.php/Camlp4">Camlp4</a>
-and OCaml functors
+<h2 id="Camlp4">Extending Camlp4 syntax</h2>
 
-phases
-defining the terminals
-preprocessing the parser
-parsing application code
+The syntax of OCaml is fairly complex,
+so extending its implementation in Camlp4 can be difficult.
+To make matters worse, as of June 2012, 
+the Camlp4 manual is badly out of date.
 
-Metl adds parser-combinator syntax to Camlp4,
- on top of terminal syntax for whatever data is to be parsed.
-Metl is distributed with syntax for parsing strings,
-and users can create their own Metl modules for parsing
-any other kinds of data supported by OCaml.
-Each Metl module is implemented as a Camlp4 plugin (a single OCaml object file).
-You parse a Metl file by passing a Metl module to Camlp4:
-
-<pre>ocamlc -pp "camlp4rf foo.cmo" bar.ml</pre>
-
-Metl parsers are created with forms that start with the keyword "rule".
-
-
-
--->
-
-<p>
-
-<h2 id="Plugins">Defining a Camlp4 plugin</h2>
-
-<ol><li>Define a functor that defines a Reader module and passes it to Metl.
-</li><li>Define a small module, of type Camlp4.Sig.Id, that identifies your parser to Camlp4.
-</li><li>Pass these modules to the functor Camlp4.Register.Plugin.
- (<em>note: this will probably be changed soon to use OCamlSyntaxExtension instead of Plugin.</em>)
-</li><li>All parsing expressions must make sure the name "<tt>metlbuf</tt>" is always bound to the current buffer.
-</li><li>Define a type for the buffer in a module to be linked with the final parsing code.
-</li><li>Write code to initialize the buffer with the data and pass the buffer to your main parsing function.
-</li></ol>
-<pre>
-module Make (U: sig end) = struct
-  module Reader : Metl.READER.T = struct
-   (* 
-    * Put your syntax extensions here.
-    * See the Camlp4 manual for details.
-    *)
-  module M = Metl.Syntax.Make(Reader);
-end;
-
-module Id = struct
-  value name = "Foo";
-  value version = "1.0";
-end;
-
-module M = Camlp4.Register.Plugin (Id) (Make);
-</pre>
-
-<!--
-
-<h4>Terminal syntax</h4>
-
-All terminal syntax is defined in the Reader module. 
-For example, PaMetlString.Parser defines the keywords EOI and ANY for the end of the string and the next element, respectively, in addition to quoted literals and the range operator.
-
--->
+<ul><li>Use MetlString as a template.
+</li><li>Copy the Camlp4 grammar extensions in camlp4/Camlp4Parsers of the OCaml distribution: Calmp4OCamlRevisedParser.ml (revised syntax and entries of original syntax that match revised syntax) or Calmp4OCamlReloadedParser.ml (original syntax entries that differ from revised syntax).
+</li></ul>
 
 <div style="text-align:center"> &copy; 2012 Daniel S. Bensen </div>
 
