@@ -17,10 +17,10 @@ module Make (U: sig end) = struct
     open Metl.Utils
     ;
     value next =
-    <:expr< MetlStringAux.Aux.((metlbuf.str.[metlbuf.n],
+    <:expr< MetlStringAux.((metlbuf.str.[metlbuf.n],
 				{(metlbuf) with n = metlbuf.n + 1})) >>
     ;
-    value eoi = <:expr< MetlStringAux.Aux.(metlbuf.n = metlbuf.length) >>
+    value eoi = <:expr< MetlStringAux.(metlbuf.n = metlbuf.length) >>
     ;
     value next_char_test_name c = 
       if      Base. is_word_char  c then  "is_word_char"
@@ -30,7 +30,7 @@ module Make (U: sig end) = struct
     ;
     value token_expr tok =
       let f = next_char_test_name tok.[String.length tok - 1] in
-      <:expr< MetlStringAux.Aux.has_token MetlStringAux.Base.$lid:f$ $str:tok$ metlbuf >>
+      <:expr< MetlStringAux.has_token MetlStringAux.$lid:f$ $str:tok$ metlbuf >>
     ;
     type ast =
       [ String of (string*string)
@@ -44,14 +44,14 @@ module Make (U: sig end) = struct
 	<:expr<
 	if not $token_expr s$ then $enone$
 	else
-	  let metlbuf = MetlStringAux.Aux.({(metlbuf) with n = metlbuf.n + $int: string_of_int len$})
+	  let metlbuf = MetlStringAux.({(metlbuf) with n = metlbuf.n + $int: string_of_int len$})
 	  in $esome$ >>
       | Char (_,str) ->
-          <:expr< match (MetlStringAux.Aux.char $chr:str$ metlbuf) with
+          <:expr< match (MetlStringAux.char $chr:str$ metlbuf) with
                   [ None -> $enone$
                   | Some ($pat:x$, metlbuf) -> $esome$ ] >>
       | Range ((_,str1),(_,str2)) ->
-          <:expr< match (MetlStringAux.Aux.range $chr:str1$ $chr:str2$ metlbuf) with
+          <:expr< match (MetlStringAux.range $chr:str1$ $chr:str2$ metlbuf) with
                   [ None -> $enone$
                   | Some ($pat:x$, metlbuf) -> $esome$ ] >>
     ]

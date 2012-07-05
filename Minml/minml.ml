@@ -21,7 +21,7 @@ let input_file infile =
   in
   String.concat "\n" (with_open_in infile f)
 
-module MS = MetlStringAux.Aux
+module MS = MetlStringAux
 
 let process infile =
   let text = input_file infile in

@@ -3,6 +3,8 @@
  * See LICENSE for details.
  *)
 
+include MetlStringBase
+
 type metl_buffer = { str: string; length: int; n: int }
 
 let make_buffer str = { str=str; length = String.length str; n = 0 }
@@ -27,15 +29,15 @@ let string_all f str =
 
 let is_word str = 
   String.length str > 0 &&
-  not (Base.is_dig str.[0]) &&
-  string_all Base.is_word_char str
+  not (is_dig str.[0]) &&
+  string_all is_word_char str
 
 let is_symbol str = 
   String.length str > 0 &&
-  string_all Base.is_symbol_char str
+  string_all is_symbol_char str
 
 let is_delimitor str =
-  String.length str = 1 && Base.is_delim_char str.[0]
+  String.length str = 1 && is_delim_char str.[0]
 
 (* type t = Word | Symbol | Delim | Mixed *)
 

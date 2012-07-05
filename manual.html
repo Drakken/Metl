@@ -6,52 +6,64 @@
 <style type="text/css">
 div.info { margin-left : 3em; margin-right : 3em }
 pre { margin-left: 3em }
+h2 { margin-top: 1.5em }
 </style>
 </head>
 <body>
+<br>
 <h1 style="text-align:center">Metl User's Manual</h1>
 
+<div style="text-align:center"><small>&copy; 2012 Daniel S. Bensen</small></div>
+<br>
 <table align="center" style="border-spacing: 1em .5em"> <!-- max-width: 48em; min-width: 30em"-->
 <tr><td>
 <a href="#Tutorial">Getting started</a>
 <br><a href="#Grammar">Grammar and precedence table</a>
 <br><a href="#MetlString">MetlString</a>
-<br><a href="#OtherTypes">Other types of data</a>
+<br><a href="#OtherTypes">Parsing other types of data</a>
 </td><td>
-<a href="Plugins">Defining a Camlp4 plugin</a>
-<br><a href="#Aux">The runtime module</a>
+<a href="#Plugins">Defining a Camlp4 plugin</a>
+<br><a href="#Aux">The auxiliary module</a>
 <br><a href="#Reader">Reader</a>
 <br><a href="#Camlp4">Extending Camlp4 syntax</a>
 </td></tr></table>
 
-
-
-
-
-
-
 <p>
 Metl is a generic system for creating PEG-style parsers in <a href="http://caml.inria.fr/ocaml/index.en.html">OCaml</a>.
 Its design is loosely based on <a href="http://tinlizzie.org/ometa/">OMeta</a>,
-an object-oriented pattern-matching language developed by Alessandro Warth. 
-Metl is not object-oriented, but the OCaml module system can be used
-to create inheritance hierarchies of singleton parsers.
+a pattern-matching language developed by Alessandro Warth. 
 Metl allows the parser designer to define custom syntax for parsing arbitrary types of OCaml data.
 These parsers may take parameters, including other parsers, for multimode parsing.
+The OCaml module system can be used with Metl
+ to create inheritance hierarchies of singleton parsers.
 
 <h2 id="Tutorial">Getting started</h2>
 
 The easiest way to begin learning Metl is with MetlString,
  the string-parsing module included in the Metl distribution.
-To write a program that parses character strings,
- you define a set of functions that use Metl's parsing rules
-and MetlString's terminal syntax,
- wrap the string in a value of type MetlStringAux.Aux.metl_buffer,
- and apply the entry-point parsing function to the buffer.
-Once your Metl parsers are written, you use Camlp4 and PaMetlString.cmo to preprocess them:
+The steps to write a program that parses character strings are as follows:
+<ol><li>Define a set of functions that use Metl's parsing rules
+and MetlString's terminal syntax to parse a string.
+The parsing function that describes the overall pattern to be matched
+is the entry point.
+It should refer to the other parsing functions as needed.
+</li><li>Wrap the string in a value of type <tt>MetlStringAux.metl_buffer</tt>,
+for instance with <tt>MetlStringAux.make_buffer</tt>.
+The buffer must point to the beginning of the text to be matched.
+</li><li>Apply the entry-point function to the buffer.
+The function's return value is an option that contains a tuple
+if the match is successful.
+The first value in the tuple is the value of the return expression specified by the entry point,
+and the second is a buffer that points to the end of the matched text.
+A parser's return expression is called its <em>semantic action</em>.
+It can be used for its return value, its side effects, or both.
+
+</li><li>Use Camlp4 and PaMetlString.cmo to preprocess the parsing file:
 
 <pre>ocamlc -I +camlp4 -I $(LIB) -pp "camlp4 $(LIB)/PaMetlString.cmo" \
     dynlink.cma camlp4lib.cma MetlStringAux.cma foo.ml</pre>
+
+</li></ol>
 
 <h3>Rules</h3>
 Each Metl rule defines a function that takes a single argument
@@ -61,13 +73,15 @@ Rules are syntactic forms that consist of the keyword "<tt>rule</tt>"
 For example, these rules will parse strings containing two digits separated by a plus sign:
 <pre>let digit = rule ['0'..'9': d -> Char.code d - Char.code '0']
 let sum = rule [digit: x; "+"; digit: y -> (x,y)]
-let print_sum = rule [sum: (x,y) -> Printf.printf "%d + %d = %d\n" x y (x+y)]
-let _ = print_sum (MetlStringAux.Aux.make_buffer "2+2")
+</pre>
+And extra parsers may be added for convenience:
+<pre>let print_sum = rule [sum: (x,y) -> Printf.printf "%d + %d = %d\n" x y (x+y)]
+let _ = print_sum (MetlStringAux.make_buffer "2+2")
 </pre>
 <p>
 These are some important features of the above rules:
 <ul><li>Everything before the arrow defines the rule's parser.
-</li><li>The expression after the arrow is the rule's return value.
+</li><li>Everything after the arrow is the rule's return expression (semantic action).
 </li><li>Semicolons represent a sequence.
 </li><li><tt>x</tt>, <tt>y</tt>, and <tt>d</tt> are new variables.  
 The pattern <tt>p:x</tt> binds the pattern <tt>x</tt>
@@ -86,7 +100,8 @@ If you want to disallow extra text, you can test for the end of the string with 
 
 Now <tt>sum</tt> will reject any string with trailing text.
 <p>
-To match multidigit numbers, you can apply the metarule <tt>LIST1</tt> to a similar digit parser:
+For longer numbers, you can apply the metarule <tt>LIST1</tt> to a similar digit parser
+to match one or more digits:
 
 <pre>let digstr = rule ['0'..'9': d -> Char.escaped d]
 let number =
@@ -101,7 +116,7 @@ let sum = rule [number: x; ows; "+"; ows; number: y -> x + y]
 Other features of Metl rules include default return values, the wildcard <tt>ANY</tt>, and tests.
 See the grammar and precedence table for details.
 To inherent the rules of one parser in another,
- include the base parser's module in the child module.
+put each parser in its own module and include the parent module in the child.
 <p>
 <h2 id="Grammar">Grammar and precedences</h2>
 
@@ -157,7 +172,7 @@ PEG-style alternatives (tested in left-to-right order; first match is chosen), w
 Metl is distributed with the module MetlString, 
 which can be used to parse character strings.
 
-<ul><li>'c' matches a character
+<ul><li>'c' matches the character c
 </li><li>'a'..'z' matches any character between a and z (for any two characters a and z)
 </li><li>"foo" matches a token
 </li><li>MetlString defines three mutually exclusive character classes for matching tokens:
@@ -241,20 +256,18 @@ end;
 module M = Camlp4.Register.Plugin (Id) (Make);
 </pre>
 
-<h2 id="Aux">The runtime module</h2>
+<h2 id="Aux">The auxiliary module</h2>
 
 The auxiliary module must define the type of <tt>metlbuf</tt> 
-and any function used by the parser.
-
-<ol><li>All parsing expressions must ensure that the name "<tt>metlbuf</tt>" is always bound to a current buffer, i.e. one for which <tt>next</tt> evaluates to the next item in the data series.
-</li><li>Define a type for the buffer in a module to be linked with the final parsing code.
-</li><li>Write code to initialize the buffer with the data and pass the buffer to your main parsing function.
+and any functions used by the parser.
+It should also define a function to initialize a buffer that points to the beginning of
+the data to be parsed.
 </li></ol>
 
 <h2 id="Reader">Reader</h2>
 
-Metl syntax and combinators are implemented in functors Metl.Syntax.Make and Metl.AST.Make, respectively.
-Each functor takes an argument of type Metl.READER.T, called "Reader",
+Metl syntax and combinators are implemented in the functors <tt>Metl.Syntax.Make</tt> and <tt>Metl.AST.Make</tt>, respectively.
+Each functor takes an argument of type <tt>Metl.READER.T</tt>, called "<tt>Reader</tt>",
  which must define the following syntax and parsing expressions for terminal elements.
 In all Camlp4 expressions, the name "<tt>metlbuf</tt>" is bound to the current value
 of the Metl buffer.
@@ -273,36 +286,45 @@ The Metl grammar entry will call <tt>parsr</tt> whenever it encounters unrecogni
 </div>
 <b><pre>val parser_expr: Ast.patt -> ast -> expr -> expr -> expr
 </pre></b><div class="info">
-<tt>parser_expr x p enone esome</tt> returns a Camlp4 expression that does the following:
-<ol><li>It matches <tt>metlbuf</tt> against the parsing expression represented by <tt>p</tt>,
-which was returned by <tt>parsr</tt>.
+<tt>parser_expr <em>x p enone esome</em></tt> returns a Camlp4 expression that does the following:
+<ol><li>It matches <tt>metlbuf</tt> against a parsing expression represented by
+ the ast node <tt>p</tt>, which was returned by <tt>parsr</tt>.
 </li><li>If the match succeeds, it binds the pattern <tt>x</tt> to the matching content
-and rebinds <tt>metlbuf</tt> to an updated buffer,
+and rebinds "<tt>metlbuf</tt>" to an updated buffer,
  i.e. a Metl buffer whose next item is the one immediately after the end of the matched content.
-</li><li>It evaluates to either <tt>enone</tt> (on failure) or <tt>esome</tt> (on success).
+</li><li>It evaluates to <tt>enone</tt> on failure and <tt>esome</tt> on success.
 </li></ol>
 </div><b><pre>val eoi: expr</pre></b><div class="info">
-A boolean Camlp4 expression that indicates whether the end of the input data has been reached in <tt>metlbuf</tt>.  
+A boolean Camlp4 expression that indicates whether the end
+ of the input data has been reached in <tt>metlbuf</tt>.  
 </div><b><pre>val next: expr
 </pre></b><div class="info">
 A Camlp4 expression that evalutates to <tt>(x,mb)</tt>, where <tt>x</tt> is the next item from 
-<tt>metlbuf</tt> and <tt>mb</tt> is an updated buffer.
-<tt>next</tt> should assume that end-of-input has not been reached.
+<tt>metlbuf</tt> and <tt>mb</tt> is an updated buffer, i.e. one whose next item is the one
+immediately following <tt>x</tt>.
+&nbsp;<tt>next</tt> should assume that the end of the input has not been reached.
 </div>
 <p>
 
 <h2 id="Camlp4">Extending Camlp4 syntax</h2>
 
 The syntax of OCaml is fairly complex,
-so extending its implementation in Camlp4 can be difficult.
+so extending its implementation in Camlp4 can be difficult for beginners.
 To make matters worse, as of June 2012, 
 the Camlp4 manual is badly out of date.
-
+Here are some suggestions:
 <ul><li>Use MetlString as a template.
-</li><li>Copy the Camlp4 grammar extensions in camlp4/Camlp4Parsers of the OCaml distribution: Calmp4OCamlRevisedParser.ml (revised syntax and entries of original syntax that match revised syntax) or Calmp4OCamlReloadedParser.ml (original syntax entries that differ from revised syntax).
+</li><li>Copy the Camlp4 grammar extensions in camlp4/Camlp4Parsers/ of the OCaml distribution:
+ Calmp4OCamlRevisedParser.ml for revised syntax and entries of original syntax
+ that match revised syntax, and Calmp4OCamlReloadedParser.ml for original-syntax entries
+ that differ from revised syntax.
 </li></ul>
 
+<br> 
+
 <div style="text-align:center"> &copy; 2012 Daniel S. Bensen </div>
+
+<br>
 
 </body>
 </html>

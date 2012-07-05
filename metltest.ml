@@ -1,10 +1,26 @@
 
 open Metl
-open Core
+
+
+let c = rule ['c']
+
+let foo s = rule ["foo"]
+
+
+let returns rul str val =
+  match rul str with
+  | None -> false
+  | Some (x,_) -> x = val
+
+let rejects rul str = rul str = None
 
 open OUnit;;
 
-let test1 () = assert_equal "x" (Foo.unity "x");; 
+let test1 () = returns  c   "c"   'c'
+let test2 () = rejects  c   "d"
+let test3 () = returns foo "foo" "foo"
+let test4 () = rejects foo "bar"
+
 
 let test2 () = assert_equal 100 (Foo.unity 100);;
 

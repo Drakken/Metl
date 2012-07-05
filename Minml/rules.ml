@@ -7,7 +7,7 @@ open Printf
 ;
 open Camlp4.PreCast
 ;
-value debugf: ('a, out_channel, unit) format -> 'a = ()
+value debugf f = ifprintf stdout f
 ;
 value got_list xs str = debugf "Got %d %s.\n" (List.length xs) str
 ;
