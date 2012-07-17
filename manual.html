@@ -120,8 +120,9 @@ put each parser in its own module and include the parent module in the child.
 <p>
 <h2 id="Grammar">Grammar and precedences</h2>
 
-Operators are listed in order of decreasing priority.
-
+These are the parser expressions supported by Metl,
+ listed in order of decreasing priority.
+<p>
 <table border=1><tr>
 <th>syntax</th>
 <th>description</th>
@@ -154,10 +155,18 @@ Operators are listed in order of decreasing priority.
 <td align="center"><tt><em>parser1</em> ; <em>parser2</em> ;</tt> ...</td><td>sequence
 </td>
 </tr><tr>
-<td align="center"><tt><em>parser</em>&nbsp;[->&nbsp;<em>expression</em>]</tt></td><td>a single alternative with explicit or implicit return value; every parser has a default</td>
+<td align="center"><tt><em>parser</em>&nbsp;[->&nbsp;<em>expression</em>]</tt></td><td>a single alternative with explicit or implicit return expression
+<br>Every parser has a default return expression.
+Variable bindings and explicit return expressions are not supported
+ for alternatives occuring inside parentheses within another parser expression.
+</td>
 </tr><tr>
 <td align="center">[<tt>|</tt>] <tt><em>alt1</em> | <em>alt2</em> |</tt> ...</td><td>
 PEG-style alternatives (tested in left-to-right order; first match is chosen), with optional leading pipe character
+<br>Alternatives occurring inside another parser expression have two restrictions:
+Bindings are not supported within the individual alternatives,
+and only single-variable bindings (no pattern matching) are supported for
+the alternatives as a whole.
 </td>
 </tr><tr>
 <th colspan=2>&nbsp;</th>
@@ -273,35 +282,39 @@ In all Camlp4 expressions, the name "<tt>metlbuf</tt>" is bound to the current v
 of the Metl buffer.
 
 <b><pre>
-type ast
+type pst
 </pre></b><div class="info">
-Represents terminal types in the leaves of the Metl syntax tree.
+Represents terminal types in the leaves of the Metl parser syntax tree.
 </div>
-<b><pre>val parsr: ast Entry.t
+<b><pre>val parsr: pst Entry.t
 </pre></b><div class="info">
 The Camlp4 grammar entry for terminals.
 Reader must extend this entry (see <tt>EXTEND</tt> in the Camlp4 manual)
 to handle all acceptable terminal syntax.
 The Metl grammar entry will call <tt>parsr</tt> whenever it encounters unrecognized tokens.
 </div>
-<b><pre>val parser_expr: Ast.patt -> ast -> expr -> expr -> expr
+<b><pre>val parser_expr: Ast.patt -> pst -> expr -> expr -> expr
 </pre></b><div class="info">
 <tt>parser_expr <em>x p enone esome</em></tt> returns a Camlp4 expression that does the following:
 <ol><li>It matches <tt>metlbuf</tt> against a parsing expression represented by
- the ast node <tt>p</tt>, which was returned by <tt>parsr</tt>.
+ the pst node <tt>p</tt>, which was returned by <tt>parsr</tt>.
 </li><li>If the match succeeds, it binds the pattern <tt>x</tt> to the matching content
 and rebinds "<tt>metlbuf</tt>" to an updated buffer,
  i.e. a Metl buffer whose next item is the one immediately after the end of the matched content.
 </li><li>It evaluates to <tt>enone</tt> on failure and <tt>esome</tt> on success.
 </li></ol>
-</div><b><pre>val eoi: expr</pre></b><div class="info">
-A boolean Camlp4 expression that indicates whether the end
- of the input data has been reached in <tt>metlbuf</tt>.  
-</div><b><pre>val next: expr
+</div><b><pre>val eoi: Loc.t -> expr</pre></b><div class="info">
+A function of a single parameter, which must be named "<tt>_loc</tt>"
+ in order for Camlp4 quotations to be used in the body. 
+The function returns a boolean Camlp4 expression that indicates whether
+ the end of the input data has been reached in <tt>metlbuf</tt>.  
+</div><b><pre>val next: Loc.t -> expr
 </pre></b><div class="info">
-A Camlp4 expression that evalutates to <tt>(x,mb)</tt>, where <tt>x</tt> is the next item from 
-<tt>metlbuf</tt> and <tt>mb</tt> is an updated buffer, i.e. one whose next item is the one
-immediately following <tt>x</tt>.
+Same format as <tt>eoi</tt>.   
+Returns a Camlp4 expression that evalutates to <tt>(x,mb)</tt>,
+ where <tt>x</tt> is the next item from <tt>metlbuf</tt>
+ and <tt>mb</tt> is an updated buffer, i.e.
+ one whose next item is the one immediately following <tt>x</tt>.
 &nbsp;<tt>next</tt> should assume that the end of the input has not been reached.
 </div>
 <p>

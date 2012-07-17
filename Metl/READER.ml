@@ -9,10 +9,10 @@ type   expr  = Ast.expr
 module Entry = Gram.Entry
 
 module type T = sig
-  type ast
-  val parser_expr: Ast.patt -> ast -> expr -> expr -> expr
-  val next: expr
-  val eoi: expr
-  val parsr: ast Entry.t
+  type pst
+  val parser_expr: Ast.patt -> pst -> expr -> expr -> expr
+  val next: Loc.t -> expr
+  val eoi:  Loc.t -> expr
+  val parsr: pst Entry.t
 end
 

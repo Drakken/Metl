@@ -1,7 +1,7 @@
 
 LIB=/home/dan/me/ocaml/lib
 
-.PHONY:  entries clean minml string sanitize test ruletest all
+.PHONY:  entries clean minml string sanitize test ruletest metl all
 
 entries:
 	ocamlbuild -cflags -I,+camlp4 -pp camlp4rf entries.cmo
@@ -28,8 +28,13 @@ minpp:
 	camlp4rf ../lib/PaMetlString.cmo Minml/rules.ml
 
 test:
-	ocamlc -I +camlp4 -I $(LIB) -pp "camlp4rf $(LIB)/PaMetlString.cmo" \
-        dynlink.cma camlp4lib.cma MetlStringAux.cma -o test/test.b test/test.ml
+	ocamlbuild -libs dynlink,camlp4lib,MetlStringAux \
+	-cflags -I,+camlp4,-I,$(LIB) \
+	-lflags -I,+camlp4,-I,$(LIB) \
+        -pp "camlp4of $(LIB)/PaMetlString.cmo" \
+	metltest.byte
+#	ocamlc -I +camlp4 -I $(LIB) -pp "camlp4of $(LIB)/PaMetlString.cmo" \
+#       dynlink.cma camlp4lib.cma MetlStringAux.cma -o metltest.b metltest.ml
 
 ruletest:
 	minml.byte Minml/ruletest.ml
@@ -41,4 +46,7 @@ mancode:
 	-lflags -I,+camlp4,-I,$(LIB) \
 	 mancode.byte
 
-all:  entries string minml test
+metl:  string test
+	./metltest.byte
+
+all:  string test minml ruletest

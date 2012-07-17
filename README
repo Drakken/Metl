@@ -7,9 +7,13 @@ Copyright 2012 Daniel S. Bensen
 Metl is loosely based on Allesandro Warth's OMeta pattern-matching 
 language.  See manual.html for details.
 
-There's no configure script yet, so the only way to build Metl
+There's no configure script yet, so the only way to configure Metl
 currently is to manually edit the path to the lib directory in 
-Makefile, Metl/_tags, and Minml/_tags.  Then you can run "make all".
+Makefile.  Then you can run "make metl".
+
+The distribution also currently contains a working example of
+Metl rules, called Minml.  You can build Minml by editing the lib
+path in Minml/_tags and running "make minml".
 
 Please contact Dan at danbensen@att.net for any bug reports,
 feature requests, and other related comments you might have.

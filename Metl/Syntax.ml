@@ -14,61 +14,71 @@ module Gram  = PreCast.Gram;
 
 module Make (Reader: READER.T) = struct
 
-  module AST = AST.Make(Reader);
-  open AST;
+  module Pst = Pst.Make(Reader);
+  open Pst;
 
-  ENTRIES rule action list_arg parsr sep bindpat END
+  type entry 'a = Gram.Entry.t 'a;
 
-  value _loc = PreCast.Loc.mk "Metl/Syntax";
+  value alternative: entry (pst * Ast.expr)
+                                   = Gram.Entry.mk "alternative"; Gram.Entry.clear alternative;
+  value     rule                   = Gram.Entry.mk     "rule"   ; Gram.Entry.clear rule;
+  value    action  : entry Ast.expr= Gram.Entry.mk    "action"  ; Gram.Entry.clear action;
+  value   list_arg : entry pst     = Gram.Entry.mk   "list_arg" ; Gram.Entry.clear list_arg;
+  value     sep    : entry pst     = Gram.Entry.mk     "sep"    ; Gram.Entry.clear sep;
+  value   bindpat  : entry Ast.patt= Gram.Entry.mk   "bindpat"  ; Gram.Entry.clear bindpat;
+  value  inner_alts: entry pst     = Gram.Entry.mk  "inner_alts"; Gram.Entry.clear inner_alts;
+  value   sequence : entry pst     = Gram.Entry.mk   "sequence" ; Gram.Entry.clear sequence;
+  value   seq_item : entry pst     = Gram.Entry.mk   "seq_item" ; Gram.Entry.clear seq_item;
+  value   binding  : entry pst     = Gram.Entry.mk   "binding"  ; Gram.Entry.clear binding;
   
-  value default_pe x = fun
-    [ Seq (p1,p2) ->
-      (Seq (p1, Binding (<:patt< $lid:x$ >>, p2)), <:expr< Some ($lid:x$, metlbuf) >>)
-    | p ->     (Binding (<:patt< $lid:x$ >>, p),   <:expr< Some ($lid:x$, metlbuf) >>)
-  ];
-  value pe (p,eo) =
-    let x = gensym "final_var" in
-    match eo with 
-    [ None -> default_pe x p
-    | Some e ->
-      let e' = <:expr< let $lid:x$ = $e$ in Some ($lid:x$, metlbuf) >>
-      in (p,e') ]
-  ;
-  value action_asts peos = List.map pe peos
+  value ensure_action _loc pst = fun
+    [ Some e -> (pst, <:expr< Some ($e$,metlbuf) >>)
+    | None ->
+	let x = gensym "final_val"
+	in (Binding (_loc, <:patt< $lid:x$ >>, pst), <:expr< Some ($lid:x$, metlbuf) >>)
+    ]
   ;
   EXTEND Gram
-  
-    OCaml.expr: AFTER "top" [[ "rule"; "["; OPT "|"; pes = rule; "]" -> AST.rule_expr pes ]]
+    OCaml.expr: AFTER "top" [["rule"; "["; OPT "|"; pes = rule; "]" -> rule_expr _loc pes]]
     ;
-    rule:
-      [[ peos = LIST1 [p = parsr LEVEL "seq"; eo = OPT action -> (p,eo)] SEP "|" -> action_asts peos ]]
+    rule: [[pes = LIST1 alternative SEP "|" -> pes]]
     ;
-    action: [[ "->"; e = OCaml.expr -> e]]
+    alternative: [[pst = sequence; eo = OPT action -> ensure_action _loc pst eo]]
     ;
-    sep: [[ "SEP"; p = parsr LEVEL "app" -> p ]]
+    action: [["->"; e = OCaml.expr -> e]]
     ;
-    bindpat: [[ ":"; x = OCaml.ipatt -> x ]]
+    sep: [["SEP"; p = binding LEVEL "app" -> p]]
     ;
-    list_arg: [[ p = OCaml.a_LIDENT -> App (p,[]) | p = parsr LEVEL "closed" -> p ]]
+    bindpat: [[":"; pat = OCaml.ipatt -> pat]]
     ;
-    parsr:
-      [ "alt" [ ps = LIST1 NEXT SEP "|"-> Alts ps ]
-      |  "seq"  [ p1 = SELF; ";"; p2 = NEXT -> Seq (p1,p2) ]
-      | "binding" [ p = NEXT; xo = OPT bindpat -> match xo with [None -> p | Some x -> Binding (x,p)] ]
+    list_arg: [[p = OCaml.a_LIDENT -> App (_loc,p,[]) | p = binding LEVEL "closed" -> p]]
+    ;
+    inner_alts: [[psts = LIST1 sequence SEP "|" -> Alts (_loc,psts)]]
+    ;
+    seq_item: [[";"; lpst = binding -> lpst]]
+    ;
+    sequence: [[
+      pst = binding; psts = LIST0 seq_item
+        -> if psts = [] then pst else Seq (_loc, [pst::psts])
+    ]];
+    binding: [[pst = NEXT; lpo = OPT bindpat ->
+           match lpo with
+           [ None -> pst
+           | Some pat -> Binding (_loc, pat, pst)]]
       | "app"
-	[ p = OCaml.a_LIDENT; args = LIST0 (OCaml.expr LEVEL "simple") -> App (p,args) ]
+	[p = OCaml.a_LIDENT; args = LIST0 (OCaml.expr LEVEL "simple") -> App (_loc,p,args)]
       | "unary" NONA
-        [ "!"; p = NEXT -> Absent  p
-        | "&"; p = NEXT -> Present p
-        | "?"; e = OCaml.expr ->  Test  e
-        | "OPT"; p = NEXT -> Opt p
-        | "LIST0"; p = list_arg; so = OPT sep -> List0 (p,so)
-        | "LIST1"; p = list_arg; so = OPT sep -> List1 (p,so) ]
+        [ "!"; p = NEXT -> Absent  (_loc,p)
+        | "&"; p = NEXT -> Present (_loc,p)
+        | "?"; e = OCaml.expr ->  Test  (_loc,e)
+        | "OPT"; p = NEXT -> Opt (_loc,p)
+        | "LIST0"; p = list_arg; so = OPT sep -> List0 (_loc,p,so)
+        | "LIST1"; p = list_arg; so = OPT sep -> List1 (_loc,p,so) ]
       | "closed"
-         [ "EOI" -> Eoi
-         | "ANY" -> Any
-	 | "("; p = SELF; ")" -> p
-         | pr = Reader.parsr -> Reader pr ] ]
+         [ "EOI" -> Eoi _loc
+         | "ANY" -> Any _loc
+	 | "("; p = inner_alts; ")" -> p
+         | pr = Reader.parsr -> Reader (_loc,pr) ] ]
   ;
   END;
 end;
